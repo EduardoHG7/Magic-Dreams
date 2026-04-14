@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Magic Dreams — Event Control</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/3.27.0/msal-browser.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,700;1,300&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#0a0a0f; --surface:#111118; --surface2:#18181f; --surface3:#1f1f28;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --gold:#f0c040; --gold2:#ffd966; --gold-dim:rgba(240,192,64,0.15); --gold-dim2:rgba(240,192,64,0.07);
+    --text:#f0eff5; --text2:#9896a8; --text3:#5e5c6e;
+    --red:#ff5c7a; --green:#4dffb0; --blue:#5ca8ff; --purple:#b07aff; --orange:#ff9040; --cyan:#40d4ff;
+    --ms-blue:#0078d4;
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");pointer-events:none;z-index:999;opacity:0.4;}
+ 
+  /* LOGIN */
+  #login-screen{position:fixed;inset:0;z-index:800;display:flex;align-items:center;justify-content:center;background:var(--bg);}
+  .login-bg{position:absolute;inset:0;background:radial-gradient(ellipse 70% 60% at 50% -10%,rgba(240,192,64,0.12) 0%,transparent 70%),radial-gradient(ellipse 40% 40% at 80% 80%,rgba(92,168,255,0.06) 0%,transparent 60%);}
+  .login-lines{position:absolute;inset:0;overflow:hidden;pointer-events:none;}
+  .login-lines::before{content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;background-image:linear-gradient(rgba(240,192,64,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(240,192,64,0.04) 1px,transparent 1px);background-size:60px 60px;animation:gridShift 20s linear infinite;}
+  @keyframes gridShift{to{transform:translate(60px,60px);}}
+  .login-card{position:relative;z-index:2;background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:48px 44px;width:100%;max-width:440px;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(240,192,64,0.05);animation:cardIn 0.5s ease;}
+  @keyframes cardIn{from{transform:translateY(30px) scale(0.96);opacity:0;}to{transform:none;opacity:1;}}
+  .login-logo-tag{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:4px;text-transform:uppercase;margin-bottom:8px;opacity:0.8;}
+  .login-logo{font-family:'Bebas Neue',sans-serif;font-size:44px;letter-spacing:3px;color:var(--text);line-height:1;margin-bottom:4px;}
+  .login-logo span{color:var(--gold);}
+  .login-subtitle{font-size:13px;color:var(--text3);margin-bottom:36px;}
+  .login-divider{display:flex;align-items:center;gap:12px;margin-bottom:28px;}
+  .login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:var(--border);}
+  .login-divider span{font-size:11px;color:var(--text3);letter-spacing:1px;}
+  .btn-microsoft{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:14px 20px;background:var(--ms-blue);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.2s;}
+  .btn-microsoft:hover{background:#106ebe;transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,120,212,0.4);}
+  .ms-icon{width:20px;height:20px;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+  .ms-icon div{border-radius:1px;}
+  .ms-icon div:nth-child(1){background:#f25022;}.ms-icon div:nth-child(2){background:#7fba00;}
+  .ms-icon div:nth-child(3){background:#00a4ef;}.ms-icon div:nth-child(4){background:#ffb900;}
+  .login-footer{margin-top:28px;font-size:11px;color:var(--text3);line-height:1.6;}
+  .login-footer a{color:var(--gold);}
+  .login-error{background:rgba(255,92,122,0.1);border:1px solid rgba(255,92,122,0.3);border-radius:8px;padding:12px 14px;font-size:12px;color:var(--red);margin-bottom:16px;text-align:left;display:none;}
+  .login-loading{display:none;flex-direction:column;align-items:center;gap:16px;padding:20px 0;}
+  .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--gold);border-radius:50%;animation:spin 0.8s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .sim-box{background:var(--surface2);border:1px solid var(--border2);border-radius:12px;padding:20px;margin-bottom:14px;text-align:left;}
+  .sim-label{display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+  .sim-label span{font-size:12px;font-weight:600;color:var(--text2);}
+ 
+  /* PENDING */
+  #pending-screen{position:fixed;inset:0;z-index:700;display:none;align-items:center;justify-content:center;background:var(--bg);}
+  .pending-card{background:var(--surface);border:1px solid var(--border2);border-radius:20px;padding:48px 44px;width:100%;max-width:480px;text-align:center;animation:cardIn 0.4s ease;}
+  .pending-icon{font-size:56px;margin-bottom:20px;}
+  .pending-title{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;color:var(--text);margin-bottom:10px;}
+  .pending-sub{font-size:14px;color:var(--text2);line-height:1.7;margin-bottom:24px;}
+  .pending-email{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--gold);background:var(--gold-dim);border:1px solid rgba(240,192,64,0.2);border-radius:6px;padding:8px 14px;display:inline-block;margin-bottom:24px;}
+ 
+  /* APP */
+  #app-shell{display:none;}
+  .sidebar{position:fixed;top:0;left:0;bottom:0;width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;z-index:100;}
+  .logo-area{padding:28px 24px 24px;border-bottom:1px solid var(--border);}
+  .logo-tag{font-family:'JetBrains Mono',monospace;font-size:10px;color:var(--gold);letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;opacity:0.8;}
+  .logo-name{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:2px;color:var(--text);line-height:1;}
+  .logo-name span{color:var(--gold);}
+  .sidebar-nav{flex:1;padding:20px 0;overflow-y:auto;}
+  .nav-section-label{font-size:10px;font-weight:600;letter-spacing:2.5px;color:var(--text3);text-transform:uppercase;padding:0 24px 8px;margin-top:12px;}
+  .nav-item{display:flex;align-items:center;gap:12px;padding:10px 24px;cursor:pointer;transition:all 0.15s;color:var(--text2);font-size:14px;font-weight:400;border-left:2px solid transparent;}
+  .nav-item:hover{color:var(--text);background:var(--gold-dim2);}
+  .nav-item.active{color:var(--gold);background:var(--gold-dim);border-left-color:var(--gold);font-weight:500;}
+  .nav-icon{width:18px;text-align:center;font-size:15px;flex-shrink:0;}
+  .nav-badge{margin-left:auto;background:var(--gold);color:var(--bg);font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;font-family:'JetBrains Mono',monospace;}
+  .sidebar-bottom{padding:16px;border-top:1px solid var(--border);}
+  .user-pill{display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border-radius:10px;cursor:pointer;transition:background 0.15s;position:relative;}
+  .user-pill:hover{background:var(--surface3);}
+  .user-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--bg);flex-shrink:0;}
+  .user-info{overflow:hidden;flex:1;}
+  .user-name{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .user-role-badge{font-size:10px;white-space:nowrap;}
+  .role-admin{color:var(--gold);} .role-user{color:var(--blue);}
+  .user-menu{position:absolute;bottom:60px;left:0;right:0;background:var(--surface2);border:1px solid var(--border2);border-radius:10px;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,0.5);display:none;z-index:200;}
+  .user-menu.open{display:block;}
+  .umi{padding:11px 14px;font-size:13px;color:var(--text2);cursor:pointer;transition:background 0.1s;display:flex;align-items:center;gap:9px;}
+  .umi:hover{background:var(--surface3);color:var(--text);}
+  .umi-sep{height:1px;background:var(--border);}
+ 
+  /* MAIN */
+  .main{margin-left:240px;min-height:100vh;}
+  .topbar{height:64px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 32px;gap:16px;position:sticky;top:0;z-index:50;}
+  .topbar-title{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--text);flex:1;}
+  .topbar-search{position:relative;flex:1;max-width:360px;}
+  .topbar-search input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 14px 8px 36px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border 0.2s;}
+  .topbar-search input:focus{border-color:var(--gold);}
+  .topbar-search input::placeholder{color:var(--text3);}
+  .si{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px;}
+  .btn{display:inline-flex;align-items:center;gap:7px;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all 0.15s;white-space:nowrap;}
+  .btn-primary{background:var(--gold);color:var(--bg);} .btn-primary:hover{background:var(--gold2);transform:translateY(-1px);}
+  .btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border);} .btn-ghost:hover{background:var(--surface2);color:var(--text);}
+  .btn-danger{background:rgba(255,92,122,0.1);color:var(--red);border:1px solid rgba(255,92,122,0.2);} .btn-danger:hover{background:rgba(255,92,122,0.2);}
+ 
+  /* PAGES */
+  .page{display:none;padding:32px;} .page.active{display:block;}
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;}
+  .section-title{font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1.5px;color:var(--text);}
+ 
+  /* KPI */
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px;}
+  .kpi-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:22px;position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.2s;}
+  .kpi-card:hover{border-color:var(--border2);transform:translateY(-2px);}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+  .kpi-card.gold::before{background:var(--gold);} .kpi-card.green::before{background:var(--green);}
+  .kpi-card.blue::before{background:var(--blue);} .kpi-card.purple::before{background:var(--purple);}
+  .kpi-label{font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:10px;}
+  .kpi-val{font-family:'Bebas Neue',sans-serif;font-size:42px;line-height:1;margin-bottom:6px;}
+  .kpi-card.gold .kpi-val{color:var(--gold);} .kpi-card.green .kpi-val{color:var(--green);}
+  .kpi-card.blue .kpi-val{color:var(--blue);} .kpi-card.purple .kpi-val{color:var(--purple);}
+  .kpi-sub{font-size:12px;color:var(--text3);}
+  .kpi-icon{position:absolute;right:18px;top:50%;transform:translateY(-50%);font-size:36px;opacity:0.07;}
+  .grid-3-1{display:grid;grid-template-columns:2fr 1fr;gap:20px;margin-bottom:24px;}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .panel-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px;border-bottom:1px solid var(--border);}
+  .panel-title{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:1.5px;color:var(--text);}
+  .panel-action{font-size:12px;color:var(--gold);cursor:pointer;font-weight:500;}
+  .panel-action:hover{text-decoration:underline;}
+  .panel-body{padding:20px 22px;}
+  .event-row{display:flex;align-items:center;gap:14px;padding:10px 8px;margin:0 -8px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.1s;border-radius:6px;}
+  .event-row:last-child{border-bottom:none;} .event-row:hover{background:var(--gold-dim2);}
+  .event-main{flex:1;min-width:0;}
+  .event-name{font-size:13px;font-weight:500;color:var(--text);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .event-meta{font-size:11px;color:var(--text3);display:flex;gap:10px;flex-wrap:wrap;}
+  .event-date-badge{background:var(--surface3);border:1px solid var(--border);border-radius:6px;padding:4px 10px;text-align:center;flex-shrink:0;min-width:58px;}
+  .edb-day{font-family:'Bebas Neue',sans-serif;font-size:18px;line-height:1;color:var(--gold);}
+  .edb-month{font-size:9px;letter-spacing:1px;color:var(--text3);text-transform:uppercase;}
+  .status-chip{font-size:10px;font-weight:600;letter-spacing:0.5px;padding:3px 10px;border-radius:20px;flex-shrink:0;text-transform:uppercase;}
+  .sc-active{background:rgba(77,255,176,0.12);color:var(--green);}
+  .sc-upcoming{background:rgba(92,168,255,0.12);color:var(--blue);}
+  .sc-planning{background:rgba(240,192,64,0.12);color:var(--gold);}
+  .sc-done{background:rgba(158,156,168,0.1);color:var(--text3);}
+  .sc-paused{background:rgba(255,92,122,0.1);color:var(--red);}
+  .team-member-row{display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid var(--border);}
+  .team-member-row:last-child{border-bottom:none;}
+  .member-avatar{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;color:var(--bg);}
+  .member-info{flex:1;}
+  .member-name{font-size:13px;font-weight:500;color:var(--text);}
+  .member-role{font-size:11px;color:var(--text3);}
+ 
+  /* EVENTS TABLE */
+  .events-toolbar{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;}
+  .filter-tabs{display:flex;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:hidden;flex-shrink:0;}
+  .filter-tab{padding:8px 16px;font-size:12px;font-weight:500;cursor:pointer;color:var(--text2);border-right:1px solid var(--border);transition:all 0.15s;white-space:nowrap;}
+  .filter-tab:last-child{border-right:none;}
+  .filter-tab.active{background:var(--gold);color:var(--bg);}
+  .filter-tab:not(.active):hover{background:var(--surface3);color:var(--text);}
+  .type-filter{display:flex;gap:6px;flex-wrap:wrap;}
+  .type-chip{padding:6px 12px;font-size:11px;font-weight:600;border-radius:20px;cursor:pointer;border:1px solid var(--border);color:var(--text2);transition:all 0.15s;background:var(--surface2);white-space:nowrap;}
+  .etw{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .et{width:100%;border-collapse:collapse;}
+  .et thead tr{background:var(--surface2);border-bottom:1px solid var(--border);}
+  .et th{padding:12px 16px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);text-align:left;white-space:nowrap;}
+  .et td{padding:14px 16px;font-size:13px;color:var(--text);border-bottom:1px solid var(--border);vertical-align:middle;}
+  .et tbody tr:last-child td{border-bottom:none;}
+  .et tbody tr{transition:background 0.1s;cursor:pointer;}
+  .et tbody tr:hover td{background:var(--gold-dim2);}
+  .type-tag{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:3px 9px;border-radius:5px;white-space:nowrap;}
+  .lc{display:flex;align-items:center;gap:8px;}
+  .la-sm{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--bg);flex-shrink:0;}
+  .assign-btn{font-size:11px;color:var(--gold);background:var(--gold-dim);border:1px dashed rgba(240,192,64,0.3);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+  .assign-btn:hover{background:var(--gold-dim2);border-color:var(--gold);}
+  .assign-btn-disabled{font-size:11px;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:4px 10px;cursor:default;font-family:'DM Sans',sans-serif;}
+  .pb-wrap{background:var(--surface3);border-radius:20px;height:6px;width:80px;overflow:hidden;}
+  .pb-fill{height:100%;border-radius:20px;transition:width 0.5s;}
+ 
+  /* CALENDAR */
+  .calendar-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .cal-header{display:flex;align-items:center;gap:16px;padding:18px 22px;border-bottom:1px solid var(--border);}
+  .cal-title{font-family:'Bebas Neue',sans-serif;font-size:20px;letter-spacing:1.5px;flex:1;}
+  .cal-nav{display:flex;gap:6px;}
+  .cal-nav-btn{width:32px;height:32px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px;transition:all 0.15s;}
+  .cal-nav-btn:hover{background:var(--surface3);color:var(--text);}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);}
+  .cal-dh{padding:10px;text-align:center;font-size:10px;font-weight:600;letter-spacing:1.5px;color:var(--text3);text-transform:uppercase;border-bottom:1px solid var(--border);}
+  .cal-cell{min-height:90px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:8px;transition:background 0.1s;}
+  .cal-cell:hover{background:var(--gold-dim2);}
+  .cal-cell:nth-child(7n){border-right:none;}
+  .cal-cell.om .cal-date{opacity:0.25;}
+  .cal-date{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text3);margin-bottom:6px;}
+  .cal-cell.today .cal-date{background:var(--gold);color:var(--bg);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;}
+  .cal-ed{font-size:10px;padding:2px 6px;border-radius:4px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;}
+ 
+  /* TEAM */
+  .team-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+  .team-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;transition:all 0.2s;position:relative;overflow:hidden;}
+  .team-card:hover{border-color:var(--border2);transform:translateY(-2px);}
+  .tc-top{display:flex;align-items:center;gap:14px;margin-bottom:16px;}
+  .tc-avatar{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;color:var(--bg);flex-shrink:0;}
+  .tc-name{font-size:16px;font-weight:600;color:var(--text);margin-bottom:3px;}
+  .tc-role{font-size:12px;color:var(--text3);}
+  .tc-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding-top:16px;border-top:1px solid var(--border);}
+  .tc-sv{font-family:'Bebas Neue',sans-serif;font-size:22px;line-height:1;margin-bottom:3px;}
+  .tc-sl{font-size:10px;color:var(--text3);}
+  .tc-evs{margin-top:14px;display:flex;flex-direction:column;gap:5px;}
+  .tc-et{font-size:11px;padding:3px 9px;border-radius:5px;display:inline-block;color:var(--text2);background:var(--surface2);border:1px solid var(--border);}
+ 
+  /* ADMIN */
+  .aut{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .aut table{width:100%;border-collapse:collapse;}
+  .aut th{padding:12px 16px;font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);text-align:left;background:var(--surface2);border-bottom:1px solid var(--border);}
+  .aut td{padding:14px 16px;font-size:13px;color:var(--text);border-bottom:1px solid var(--border);vertical-align:middle;}
+  .aut tbody tr:last-child td{border-bottom:none;}
+  .aut tbody tr:hover td{background:var(--gold-dim2);}
+  .role-select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:5px 10px;font-size:12px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;transition:border 0.2s;}
+  .role-select:focus{border-color:var(--gold);}
+  .role-select option{background:var(--surface2);}
+  .badge-pending{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(255,144,64,0.12);color:var(--orange);}
+  .badge-admin{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(240,192,64,0.12);color:var(--gold);}
+  .badge-user{display:inline-flex;align-items:center;gap:5px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;background:rgba(92,168,255,0.12);color:var(--blue);}
+  .info-banner{background:rgba(92,168,255,0.07);border:1px solid rgba(92,168,255,0.2);border-radius:10px;padding:12px 16px;font-size:13px;color:var(--blue);display:flex;align-items:center;gap:10px;margin-bottom:20px;}
+ 
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
+  .modal-overlay.open{display:flex;}
+  .modal{background:var(--surface);border:1px solid var(--border2);border-radius:16px;width:100%;max-width:680px;max-height:90vh;overflow-y:auto;animation:modalIn 0.2s ease;}
+  @keyframes modalIn{from{transform:translateY(20px) scale(0.97);opacity:0;}to{transform:none;opacity:1;}}
+  .mh{display:flex;align-items:flex-start;gap:16px;padding:28px 28px 0;}
+  .mti{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+  .mht{flex:1;}
+  .men{font-family:'Bebas Neue',sans-serif;font-size:26px;letter-spacing:1px;color:var(--text);margin-bottom:4px;}
+  .mc{background:var(--surface2);border:1px solid var(--border);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text2);font-size:16px;flex-shrink:0;transition:all 0.15s;}
+  .mc:hover{background:var(--surface3);color:var(--text);}
+  .mb{padding:20px 28px 28px;}
+  .mg{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:22px;}
+  .mf{background:var(--surface2);border-radius:10px;padding:14px;border:1px solid var(--border);}
+  .mfl{font-size:10px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:var(--text3);margin-bottom:6px;}
+  .mfv{font-size:14px;color:var(--text);font-weight:500;}
+  .mst{font-family:'Bebas Neue',sans-serif;font-size:14px;letter-spacing:1.5px;color:var(--text2);margin-bottom:12px;margin-top:20px;}
+  .mnotes{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:13px;color:var(--text2);line-height:1.6;margin-top:12px;}
+  .ma{display:flex;gap:10px;margin-top:22px;padding-top:18px;border-top:1px solid var(--border);}
+  .form-row{display:grid;gap:14px;margin-bottom:14px;}
+  .form-row.col2{grid-template-columns:1fr 1fr;} .form-row.col3{grid-template-columns:1fr 1fr 1fr;}
+  .fg{display:flex;flex-direction:column;gap:6px;}
+  .fl{font-size:11px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--text3);}
+  .fi,.fs,.fta{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text);font-family:'DM Sans',sans-serif;outline:none;transition:border 0.2s;width:100%;}
+  .fi:focus,.fs:focus,.fta:focus{border-color:var(--gold);}
+  .fi::placeholder,.fta::placeholder{color:var(--text3);}
+  .fs option{background:var(--surface2);color:var(--text);}
+  .fta{resize:vertical;min-height:80px;}
+ 
+  /* TOAST */
+  .toast-container{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px;pointer-events:none;}
+  .toast{background:var(--surface2);border:1px solid var(--border2);border-left:3px solid var(--gold);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--text);min-width:260px;animation:toastIn 0.3s ease;pointer-events:all;box-shadow:0 8px 32px rgba(0,0,0,0.4);}
+  .toast.error{border-left-color:var(--red);}
+  @keyframes toastIn{from{transform:translateX(20px);opacity:0;}to{transform:none;opacity:1;}}
+  @keyframes toastOut{to{transform:translateX(20px);opacity:0;}}
+  ::-webkit-scrollbar{width:6px;height:6px;} ::-webkit-scrollbar-track{background:transparent;} ::-webkit-scrollbar-thumb{background:var(--surface3);border-radius:3px;}
+ 
+  @media(max-width:1100px){.kpi-grid{grid-template-columns:repeat(2,1fr);}.grid-3-1{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+ 
+<!-- LOGIN -->
+<div id="login-screen">
+  <div class="login-bg"></div>
+  <div class="login-lines"></div>
+  <div class="login-card">
+    <div class="login-logo-tag">Event Control</div>
+    <div class="login-logo">MAGIC <span>DREAMS</span></div>
+    <div class="login-subtitle">Productions — Sistema de Gestión de Eventos</div>
+    <div class="login-error" id="login-error"></div>
+    <div class="login-divider"><span>ACCESO CORPORATIVO</span></div>
+    <div id="login-form-area">
+      <button class="btn-microsoft" onclick="loginWithMicrosoft()">
+        <div class="ms-icon"><div></div><div></div><div></div><div></div></div>
+        Continuar con Microsoft / Outlook
+      </button>
+    </div>
+    <div class="login-loading" id="login-loading">
+      <div class="spinner"></div>
+      <div style="font-size:13px;color:var(--text3)">Autenticando con Microsoft...</div>
+    </div>
+    <div class="login-footer">Usa tu cuenta corporativa <a>@magicdr.com</a> u <a>@outlook.com</a><br>El acceso está sujeto a aprobación del administrador.</div>
+  </div>
+</div>
+ 
+<!-- PENDING -->
+<div id="pending-screen" style="display:none;align-items:center;justify-content:center;background:var(--bg)">
+  <div class="login-bg"></div>
+  <div class="pending-card">
+    <div class="pending-icon">⏳</div>
+    <div class="pending-title">ACCESO PENDIENTE</div>
+    <div class="pending-sub">Tu cuenta fue registrada exitosamente. El administrador debe aprobar tu acceso antes de ingresar al sistema.</div>
+    <div class="pending-email" id="pending-email">—</div>
+    <div class="pending-sub" style="font-size:12px">Intenta de nuevo una vez que el administrador te asigne un rol.</div>
+    <br>
+    <button class="btn btn-ghost" onclick="logout()" style="width:100%;justify-content:center;margin-top:8px">← Cerrar sesión</button>
+  </div>
+</div>
+ 
+<!-- APP -->
+<div id="app-shell">
+  <aside class="sidebar">
+    <div class="logo-area">
+      <div class="logo-tag">Event Control</div>
+      <div class="logo-name">MAGIC <span>DREAMS</span></div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Principal</div>
+      <div class="nav-item active" onclick="navigate('dashboard')"><span class="nav-icon">⚡</span> Dashboard</div>
+      <div class="nav-item" onclick="navigate('events')"><span class="nav-icon">🎪</span> Todos los Eventos<span class="nav-badge" id="nav-badge">0</span></div>
+      <div class="nav-item" onclick="navigate('calendar')"><span class="nav-icon">📅</span> Calendario</div>
+      <div class="nav-section-label">Equipo</div>
+      <div class="nav-item" onclick="navigate('team')"><span class="nav-icon">👥</span> Líderes & Equipo</div>
+      <div class="nav-section-label">Tipos</div>
+      <div class="nav-item" onclick="filterByType('Concierto/Musical')"><span class="nav-icon">🎵</span> Musicales</div>
+      <div class="nav-item" onclick="filterByType('Teatro')"><span class="nav-icon">🎭</span> Teatro</div>
+      <div class="nav-item" onclick="filterByType('Conferencia')"><span class="nav-icon">🎤</span> Conferencias</div>
+      <div class="nav-item" onclick="filterByType('Corporativo/Marca')"><span class="nav-icon">🏢</span> Corporativos</div>
+      <div class="nav-item" onclick="filterByType('Deportivo')"><span class="nav-icon">🏆</span> Deportivos</div>
+      <div class="nav-item" onclick="filterByType('Cultural')"><span class="nav-icon">🎨</span> Culturales</div>
+      <div id="admin-nav" style="display:none">
+        <div class="nav-section-label">Administración</div>
+        <div class="nav-item" onclick="navigate('admin')"><span class="nav-icon">🛡</span> Control de Acceso</div>
+      </div>
+    </nav>
+    <div class="sidebar-bottom">
+      <div style="position:relative">
+        <div class="user-menu" id="user-menu">
+          <div class="umi" onclick="logout()">🚪 Cerrar Sesión</div>
+          <div class="umi-sep"></div>
+          <div class="umi" style="font-size:11px;color:var(--text3);cursor:default" id="umi-role">—</div>
+        </div>
+        <div class="user-pill" onclick="toggleMenu()">
+          <div class="user-avatar" id="sb-avatar">?</div>
+          <div class="user-info">
+            <div class="user-name" id="sb-name">—</div>
+            <div class="user-role-badge" id="sb-role">—</div>
+          </div>
+          <span style="font-size:10px;color:var(--text3)">▲</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+ 
+  <main class="main">
+    <div class="topbar">
+      <div class="topbar-title" id="topbar-title">DASHBOARD</div>
+      <div class="topbar-search"><span class="si">🔍</span><input type="text" placeholder="Buscar eventos..." oninput="searchEvents(this.value)" id="search-input"></div>
+      <button class="btn btn-primary" id="btn-new-event" onclick="openNewEvent()">＋ Nuevo Evento</button>
+    </div>
+ 
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="kpi-grid">
+        <div class="kpi-card gold"><div class="kpi-label">Eventos Activos</div><div class="kpi-val" id="k-active">0</div><div class="kpi-sub">En producción</div><div class="kpi-icon">⚡</div></div>
+        <div class="kpi-card blue"><div class="kpi-label">Próximos 30d</div><div class="kpi-val" id="k-up">0</div><div class="kpi-sub">Confirmados</div><div class="kpi-icon">📅</div></div>
+        <div class="kpi-card green"><div class="kpi-label">Equipo</div><div class="kpi-val" id="k-team">0</div><div class="kpi-sub">Líderes</div><div class="kpi-icon">👥</div></div>
+        <div class="kpi-card purple"><div class="kpi-label">Sin Asignar</div><div class="kpi-val" id="k-unassigned">0</div><div class="kpi-sub">Requieren líder</div><div class="kpi-icon">⚠️</div></div>
+      </div>
+      <div class="grid-3-1">
+        <div class="panel"><div class="panel-header"><div class="panel-title">EVENTOS ACTIVOS & PRÓXIMOS</div><span class="panel-action" onclick="navigate('events')">Ver todos →</span></div><div class="panel-body" id="d-events"></div></div>
+        <div class="panel"><div class="panel-header"><div class="panel-title">LÍDERES</div><span class="panel-action" onclick="navigate('team')">Equipo →</span></div><div class="panel-body" id="d-team"></div></div>
+      </div>
+      <div class="panel"><div class="panel-header"><div class="panel-title">TIMELINE — PRÓXIMOS EVENTOS</div></div><div class="panel-body" id="d-timeline"></div></div>
+    </div>
+ 
+    <!-- EVENTS -->
+    <div class="page" id="page-events">
+      <div class="events-toolbar">
+        <div class="filter-tabs" id="sf-tabs">
+          <div class="filter-tab active" onclick="setSF('all',this)">Todos</div>
+          <div class="filter-tab" onclick="setSF('active',this)">Activos</div>
+          <div class="filter-tab" onclick="setSF('upcoming',this)">Próximos</div>
+          <div class="filter-tab" onclick="setSF('planning',this)">Planeación</div>
+          <div class="filter-tab" onclick="setSF('done',this)">Finalizados</div>
+        </div>
+        <div class="type-filter" id="tf-chips"></div>
+        <div style="margin-left:auto"><button class="btn btn-primary" id="btn-new-event2" onclick="openNewEvent()">＋ Nuevo Evento</button></div>
+      </div>
+      <div class="etw"><table class="et"><thead><tr><th>Evento</th><th>Tipo</th><th>Fecha</th><th>Lugar</th><th>Líder</th><th>Progreso</th><th>Estado</th></tr></thead><tbody id="et-body"></tbody></table></div>
+    </div>
+ 
+    <!-- CALENDAR -->
+    <div class="page" id="page-calendar">
+      <div class="calendar-wrap">
+        <div class="cal-header"><div class="cal-title" id="cal-label">Abril 2026</div><div class="cal-nav"><button class="cal-nav-btn" onclick="changeMonth(-1)">‹</button><button class="cal-nav-btn" onclick="changeMonth(1)">›</button></div></div>
+        <div class="cal-grid" id="cal-grid">
+          <div class="cal-dh">Dom</div><div class="cal-dh">Lun</div><div class="cal-dh">Mar</div><div class="cal-dh">Mié</div><div class="cal-dh">Jue</div><div class="cal-dh">Vie</div><div class="cal-dh">Sáb</div>
+        </div>
+      </div>
+    </div>
+ 
+    <!-- TEAM -->
+    <div class="page" id="page-team">
+      <div class="section-header">
+        <div class="section-title">EQUIPO — LÍDERES & RESPONSABLES</div>
+        <button class="btn btn-primary" id="btn-new-member" onclick="openNewMember()">＋ Agregar Miembro</button>
+      </div>
+      <div class="team-grid" id="team-grid"></div>
+    </div>
+ 
+    <!-- ADMIN -->
+    <div class="page" id="page-admin">
+      <div class="section-header">
+        <div class="section-title">🛡 CONTROL DE ACCESO</div>
+        <div style="font-size:12px;color:var(--text3)">Solo visible para administradores</div>
+      </div>
+      <div class="info-banner">
+        ℹ️ Aprueba usuarios y asigna roles. <strong style="color:var(--gold)">Administrador</strong>: gestión completa + asignar líderes. <strong style="color:var(--blue)">Usuario</strong>: solo lectura. <strong style="color:var(--orange)">Pendiente</strong>: sin acceso hasta aprobación.
+      </div>
+      <div class="aut"><table><thead><tr><th>Usuario</th><th>Email</th><th>Última sesión</th><th>Rol actual</th><th>Cambiar rol</th></tr></thead><tbody id="admin-tbody"></tbody></table></div>
+    </div>
+  </main>
+</div>
+ 
+<!-- MODAL EVENT DETAIL -->
+<div class="modal-overlay" id="ev-modal"><div class="modal" id="ev-modal-content"></div></div>
+ 
+<!-- MODAL NEW EVENT -->
+<div class="modal-overlay" id="new-ev-modal">
+  <div class="modal">
+    <div class="mh"><div class="mti" style="background:var(--gold-dim)">✨</div><div class="mht"><div class="men">NUEVO EVENTO</div><div style="font-size:13px;color:var(--text3)">Completa los detalles</div></div><div class="mc" onclick="closeModal('new-ev-modal')">✕</div></div>
+    <div class="mb">
+      <div class="form-row col2"><div class="fg"><label class="fl">Nombre *</label><input class="fi" id="ne-name" placeholder="Ej: Festival de Jazz Panama 2026"></div><div class="fg"><label class="fl">Tipo *</label><select class="fs" id="ne-type"><option value="">Seleccionar...</option><option>Concierto/Musical</option><option>Teatro</option><option>Conferencia</option><option>Corporativo/Marca</option><option>Deportivo</option><option>Cultural</option></select></div></div>
+      <div class="form-row col3"><div class="fg"><label class="fl">Fecha *</label><input class="fi" id="ne-date" type="date"></div><div class="fg"><label class="fl">Hora</label><input class="fi" id="ne-time" type="time"></div><div class="fg"><label class="fl">Estado</label><select class="fs" id="ne-status"><option value="planning">Planeación</option><option value="upcoming">Próximo</option><option value="active">Activo</option></select></div></div>
+      <div class="form-row col2"><div class="fg"><label class="fl">Venue / Lugar</label><input class="fi" id="ne-venue" placeholder="Ej: Anfiteatro de Panamá"></div><div class="fg"><label class="fl">Líder Responsable</label><select class="fs" id="ne-leader"><option value="">Sin asignar</option></select></div></div>
+      <div class="form-row col2"><div class="fg"><label class="fl">Aforo</label><input class="fi" id="ne-cap" type="number" placeholder="Ej: 5000"></div><div class="fg"><label class="fl">Progreso (%)</label><input class="fi" id="ne-prog" type="number" min="0" max="100" value="0"></div></div>
+      <div class="form-row"><div class="fg"><label class="fl">Notas</label><textarea class="fta" id="ne-notes" placeholder="Artistas, requerimientos técnicos..."></textarea></div></div>
+      <div class="ma"><button class="btn btn-primary" onclick="createEvent()" style="flex:1">✓ Crear Evento</button><button class="btn btn-ghost" onclick="closeModal('new-ev-modal')">Cancelar</button></div>
+    </div>
+  </div>
+</div>
+ 
+<!-- MODAL NEW MEMBER -->
+<div class="modal-overlay" id="new-mb-modal">
+  <div class="modal" style="max-width:480px">
+    <div class="mh"><div class="mti" style="background:var(--gold-dim)">👤</div><div class="mht"><div class="men">NUEVO MIEMBRO</div><div style="font-size:13px;color:var(--text3)">Agrega un líder al equipo</div></div><div class="mc" onclick="closeModal('new-mb-modal')">✕</div></div>
+    <div class="mb">
+      <div class="form-row col2"><div class="fg"><label class="fl">Nombre *</label><input class="fi" id="nm-name" placeholder="Nombre completo"></div><div class="fg"><label class="fl">Cargo *</label><input class="fi" id="nm-role" placeholder="Ej: Producción General"></div></div>
+      <div class="form-row col2"><div class="fg"><label class="fl">Email</label><input class="fi" id="nm-email" type="email" placeholder="correo@magicdr.com"></div><div class="fg"><label class="fl">Teléfono</label><input class="fi" id="nm-phone" placeholder="+507..."></div></div>
+      <div class="form-row"><div class="fg"><label class="fl">Especialidades</label><input class="fi" id="nm-spec" placeholder="Ej: Musicales, Corporativos..."></div></div>
+      <div class="ma"><button class="btn btn-primary" onclick="createMember()" style="flex:1">✓ Agregar</button><button class="btn btn-ghost" onclick="closeModal('new-mb-modal')">Cancelar</button></div>
+    </div>
+  </div>
+</div>
+ 
+<div class="toast-container" id="tc"></div>
+ 
+<script>
+// ============================================================
+// AZURE AD CONFIG
+// Para producción: registra la app en portal.azure.com y pon tu clientId real.
+// Documentación: https://learn.microsoft.com/azure/active-directory/develop/quickstart-register-app
+// ============================================================
+const AZURE_CLIENT_ID = "YOUR_CLIENT_ID_HERE"; // ← Reemplaza con tu Application (client) ID de Azure AD
+const AZURE_TENANT = "common"; // O reemplaza con tu Tenant ID específico
+ 
+// SIMULATE_AUTH = true  → modo demo (sin Azure AD real, login con formulario)
+// SIMULATE_AUTH = false → usa MSAL real con el clientId configurado arriba
+const SIMULATE_AUTH = true;
+ 
+const MSAL_CONFIG = {
+  auth: {
+    clientId: AZURE_CLIENT_ID,
+    authority: `https://login.microsoftonline.com/${AZURE_TENANT}`,
+    redirectUri: window.location.origin + window.location.pathname,
+  },
+  cache: { cacheLocation:"sessionStorage", storeAuthStateInCookie:false },
+};
+ 
+// ============================================================
+// USER STORE (en producción: reemplazar con backend/BD real)
+// ============================================================
+const SK_USERS = 'mdp_users_v2';
+const SK_SESSION = 'mdp_session_v2';
+let USERS = JSON.parse(localStorage.getItem(SK_USERS)||'[]');
+ 
+function saveUsers(){ localStorage.setItem(SK_USERS,JSON.stringify(USERS)); }
+function loadSess(){ try{ return JSON.parse(sessionStorage.getItem(SK_SESSION)||'null'); }catch{ return null; } }
+function saveSess(u){ sessionStorage.setItem(SK_SESSION,JSON.stringify(u)); }
+function clearSess(){ sessionStorage.removeItem(SK_SESSION); }
+ 
+// Seed: Eduardo = admin always
+(function seedAdmin(){
+  const e = 'eduardo@magicdr.com';
+  if(!USERS.find(u=>u.email===e)){
+    USERS.push({ id:'admin-ed', name:'Eduardo', email:e, role:'admin', initials:'ED', color:'#f0c040', lastSeen:new Date().toISOString() });
+    saveUsers();
+  }
+})();
+ 
+// ============================================================
+// STATE
+// ============================================================
+let CU = null; // current user
+let msalApp = null;
+ 
+const COLORS = ['#f0c040','#ff9040','#4dffb0','#5ca8ff','#b07aff','#ff5c7a','#40d4ff','#ff6eb0'];
+const TC = {
+  'Concierto/Musical':{icon:'🎵',color:'#f0c040',bg:'rgba(240,192,64,0.12)'},
+  'Teatro':{icon:'🎭',color:'#b07aff',bg:'rgba(176,122,255,0.12)'},
+  'Conferencia':{icon:'🎤',color:'#5ca8ff',bg:'rgba(92,168,255,0.12)'},
+  'Corporativo/Marca':{icon:'🏢',color:'#40d4ff',bg:'rgba(64,212,255,0.12)'},
+  'Deportivo':{icon:'🏆',color:'#ff9040',bg:'rgba(255,144,64,0.12)'},
+  'Cultural':{icon:'🎨',color:'#4dffb0',bg:'rgba(77,255,176,0.12)'},
+};
+const SC = {
+  active:{label:'Activo',cls:'sc-active'},
+  upcoming:{label:'Próximo',cls:'sc-upcoming'},
+  planning:{label:'Planeación',cls:'sc-planning'},
+  done:{label:'Finalizado',cls:'sc-done'},
+  paused:{label:'Pausado',cls:'sc-paused'},
+};
+ 
+let EVENTS=[
+  {id:1,name:'Noche de Ópera — Gran Teatro',type:'Teatro',status:'active',date:'2026-04-14',time:'20:00',venue:'Gran Teatro Nacional, Panamá',leader:1,progress:85,capacity:800,notes:'Producción completa de La Traviata. 48 músicos. Vestuario en proceso.'},
+  {id:2,name:'Festival Electronika Panama 2026',type:'Concierto/Musical',status:'upcoming',date:'2026-04-26',time:'18:00',venue:'Anfiteatro de Ancón, Panama City',leader:2,progress:60,capacity:12000,notes:'6 artistas internacionales. Stage principal + 2 secundarios.'},
+  {id:3,name:'TechSummit Latam 2026',type:'Conferencia',status:'upcoming',date:'2026-05-08',time:'09:00',venue:'Centro de Convenciones Figali',leader:3,progress:40,capacity:3500,notes:'30 speakers confirmados, 5 paneles simultáneos.'},
+  {id:4,name:'Lanzamiento Claro 5G',type:'Corporativo/Marca',status:'planning',date:'2026-05-22',time:'19:00',venue:'Hard Rock Hotel, Panama',leader:null,progress:15,capacity:600,notes:'Experiencias interactivas, zona de demos, cena de gala.'},
+  {id:5,name:'Copa Centroamérica de Boxeo',type:'Deportivo',status:'planning',date:'2026-06-14',time:'16:00',venue:'Gimnasio Nuevo Panama',leader:2,progress:25,capacity:5000,notes:'Torneo regional de 3 días. TV regional.'},
+  {id:6,name:'Festival de Artes Escénicas',type:'Cultural',status:'planning',date:'2026-07-01',time:'17:00',venue:'Casco Antiguo, Panama City',leader:null,progress:5,capacity:2000,notes:'5 días. Danza, teatro callejero, instalaciones.'},
+  {id:7,name:'Concierto Carlos Vives',type:'Concierto/Musical',status:'done',date:'2026-03-15',time:'20:00',venue:'Multicentro Arena, Panama',leader:1,progress:100,capacity:8000,notes:'7,800 asistentes. Exitoso.'},
+  {id:8,name:'Cumbre Empresarial Panama 2026',type:'Conferencia',status:'upcoming',date:'2026-04-28',time:'08:00',venue:'Westin Playa Bonita',leader:4,progress:55,capacity:1200,notes:'30 keynotes, breakout sessions por industria.'},
+];
+ 
+let TEAM=[
+  {id:1,name:'Valeria Montoya',role:'Directora de Producción',email:'v.montoya@magicdr.com',phone:'+507 6123-4567',color:'#f0c040',initials:'VM',specialties:['Teatro','Musicales','Corporativos']},
+  {id:2,name:'Diego Herrera',role:'Productor General',email:'d.herrera@magicdr.com',phone:'+507 6234-5678',color:'#5ca8ff',initials:'DH',specialties:['Conciertos','Deportivos','Festivales']},
+  {id:3,name:'Camila Torres',role:'Coordinadora de Eventos',email:'c.torres@magicdr.com',phone:'+507 6345-6789',color:'#4dffb0',initials:'CT',specialties:['Conferencias','Corporativos']},
+  {id:4,name:'Rafael Ríos',role:'Productor Ejecutivo',email:'r.rios@magicdr.com',phone:'+507 6456-7890',color:'#b07aff',initials:'RR',specialties:['Conferencias','Culturales']},
+];
+ 
+let curPage='dashboard', sfFilter='all', tfFilter='', calY=2026, calM=3;
+const isAdmin=()=>CU?.role==='admin';
+ 
+// ============================================================
+// AUTH
+// ============================================================
+async function initApp(){
+  if(!SIMULATE_AUTH){
+    try{
+      msalApp=new msal.PublicClientApplication(MSAL_CONFIG);
+      await msalApp.initialize();
+      const r=await msalApp.handleRedirectPromise();
+      if(r){ handleMSProfile({id:r.account.homeAccountId,name:r.account.name,email:r.account.username}); return; }
+    }catch(e){ console.error('MSAL error:',e); }
+  }
+  const saved=loadSess();
+  if(saved){
+    const fresh=USERS.find(u=>u.id===saved.id);
+    if(fresh){ CU=fresh; saveSess(CU); fresh.role==='pending'?showPending():enterApp(); return; }
+  }
+  document.getElementById('login-screen').style.display='flex';
+}
+ 
+async function loginWithMicrosoft(){
+  document.getElementById('login-error').style.display='none';
+  document.getElementById('login-form-area').style.display='none';
+  document.getElementById('login-loading').style.display='flex';
+ 
+  if(SIMULATE_AUTH){ showSimLogin(); return; }
+ 
+  try{
+    const r=await msalApp.loginPopup({scopes:['openid','profile','email','User.Read']});
+    handleMSProfile({id:r.account.homeAccountId,name:r.account.name,email:r.account.username});
+  }catch(e){
+    showLoginErr('Error al conectar con Microsoft. Intenta de nuevo.');
+  }
+}
+ 
+function showSimLogin(){
+  document.getElementById('login-loading').style.display='none';
+  document.getElementById('login-form-area').style.display='block';
+  document.getElementById('login-form-area').innerHTML=`
+    <div class="sim-box">
+      <div class="sim-label">
+        <div class="ms-icon"><div></div><div></div><div></div><div></div></div>
+        <span>Microsoft — Inicio de sesión (modo demo)</span>
+      </div>
+      <div class="fg" style="margin-bottom:12px">
+        <label class="fl">Correo Microsoft / Outlook *</label>
+        <input class="fi" id="sim-email" type="email" placeholder="tu@magicdr.com">
+      </div>
+      <div class="fg" style="margin-bottom:16px">
+        <label class="fl">Tu nombre (si es primera vez)</label>
+        <input class="fi" id="sim-name" placeholder="Nombre completo">
+      </div>
+      <button class="btn-microsoft" onclick="doSimLogin()">
+        <div class="ms-icon"><div></div><div></div><div></div><div></div></div>
+        Iniciar sesión
+      </button>
+    </div>
+    <div style="font-size:11px;color:var(--text3);text-align:center;margin-top:8px">
+      💡 Demo: Admin disponible →
+      <span style="color:var(--gold);cursor:pointer" onclick="document.getElementById('sim-email').value='eduardo@magicdr.com';document.getElementById('sim-name').value='Eduardo'">eduardo@magicdr.com</span>
+    </div>`;
+}
+ 
+function doSimLogin(){
+  const email=(document.getElementById('sim-email')?.value||'').trim().toLowerCase();
+  const name=(document.getElementById('sim-name')?.value||'').trim();
+  if(!email){ showLoginErr('Ingresa tu correo.'); return; }
+  handleMSProfile({id:'sim-'+email.replace(/[^a-z0-9]/g,'-'), name:name||email.split('@')[0], email});
+}
+ 
+function handleMSProfile(p){
+  let u=USERS.find(x=>x.email===p.email);
+  if(!u){
+    const initials=p.name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    u={id:p.id,name:p.name,email:p.email,role:'pending',initials,color:COLORS[USERS.length%COLORS.length],lastSeen:new Date().toISOString()};
+    USERS.push(u); saveUsers();
+  } else {
+    u.lastSeen=new Date().toISOString();
+    if(p.name) u.name=p.name;
+    saveUsers();
+  }
+  CU=u; saveSess(CU);
+  u.role==='pending'?showPending():enterApp();
+}
+ 
+function showPending(){
+  document.getElementById('login-screen').style.display='none';
+  const ps=document.getElementById('pending-screen');
+  ps.style.display='flex'; ps.style.position='fixed'; ps.style.inset='0';
+  document.getElementById('pending-email').textContent=CU.email;
+}
+ 
+function enterApp(){
+  document.getElementById('login-screen').style.display='none';
+  document.getElementById('pending-screen').style.display='none';
+  document.getElementById('app-shell').style.display='block';
+  setupRoleUI(); renderDashboard(); updateBadge();
+}
+ 
+function logout(){ clearSess(); CU=null; location.reload(); }
+ 
+function showLoginErr(msg){
+  document.getElementById('login-loading').style.display='none';
+  document.getElementById('login-form-area').style.display='block';
+  const el=document.getElementById('login-error'); el.textContent=msg; el.style.display='block';
+}
+ 
+// ============================================================
+// ROLE UI SETUP
+// ============================================================
+function setupRoleUI(){
+  document.getElementById('sb-avatar').textContent=CU.initials;
+  document.getElementById('sb-avatar').style.background=CU.color;
+  document.getElementById('sb-name').textContent=CU.name;
+  document.getElementById('umi-role').textContent=isAdmin()?'⭐ Rol: Administrador':'👤 Rol: Usuario';
+ 
+  if(isAdmin()){
+    document.getElementById('sb-role').innerHTML='<span class="role-admin">⭐ Administrador</span>';
+    document.getElementById('admin-nav').style.display='block';
+  } else {
+    document.getElementById('sb-role').innerHTML='<span class="role-user">👤 Usuario</span>';
+    document.getElementById('admin-nav').style.display='none';
+    // Hide write buttons for users
+    ['btn-new-event','btn-new-event2','btn-new-member'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.style.display='none';
+    });
+  }
+}
+ 
+// ============================================================
+// NAVIGATION
+// ============================================================
+function navigate(page){
+  if(page==='admin'&&!isAdmin()) return;
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+page).classList.add('active');
+  const titles={dashboard:'DASHBOARD',events:'TODOS LOS EVENTOS',calendar:'CALENDARIO',team:'EQUIPO',admin:'CONTROL DE ACCESO'};
+  document.getElementById('topbar-title').textContent=titles[page]||page.toUpperCase();
+  curPage=page;
+  const ni=document.querySelectorAll('.nav-item');
+  const nm={dashboard:0,events:1,calendar:2,team:3};
+  if(nm[page]!==undefined) ni[nm[page]].classList.add('active');
+  if(page==='dashboard') renderDashboard();
+  if(page==='events') renderEventsTable();
+  if(page==='calendar') renderCalendar();
+  if(page==='team') renderTeam();
+  if(page==='admin') renderAdmin();
+}
+ 
+function filterByType(t){ tfFilter=t; navigate('events'); }
+function updateBadge(){ document.getElementById('nav-badge').textContent=EVENTS.filter(e=>e.status!=='done').length; }
+function refresh(){ if(curPage==='dashboard')renderDashboard(); if(curPage==='events')renderEventsTable(); if(curPage==='calendar')renderCalendar(); if(curPage==='team')renderTeam(); if(curPage==='admin')renderAdmin(); }
+ 
+// ============================================================
+// DASHBOARD
+// ============================================================
+function renderDashboard(){
+  const now=new Date(),in30=new Date(); in30.setDate(now.getDate()+30);
+  document.getElementById('k-active').textContent=EVENTS.filter(e=>e.status==='active').length;
+  document.getElementById('k-up').textContent=EVENTS.filter(e=>{if(e.status!=='upcoming')return false;const d=new Date(e.date);return d>=now&&d<=in30;}).length;
+  document.getElementById('k-team').textContent=TEAM.length;
+  document.getElementById('k-unassigned').textContent=EVENTS.filter(e=>!e.leader&&e.status!=='done').length;
+ 
+  const re=[...EVENTS].filter(e=>e.status!=='done').sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(0,6);
+  document.getElementById('d-events').innerHTML=re.map(e=>{
+    const tc=TC[e.type]||{icon:'📌',color:'#888'};const sc=SC[e.status]||{};
+    const d=new Date(e.date+'T12:00:00');const leader=e.leader?TEAM.find(t=>t.id===e.leader):null;
+    return `<div class="event-row" onclick="openEv(${e.id})">
+      <div class="event-date-badge"><div class="edb-day">${d.getDate()}</div><div class="edb-month">${d.toLocaleString('es',{month:'short'}).toUpperCase()}</div></div>
+      <div style="width:8px;height:8px;border-radius:50%;background:${tc.color};flex-shrink:0"></div>
+      <div class="event-main"><div class="event-name">${e.name}</div><div class="event-meta"><span>${tc.icon} ${e.type}</span><span>📍 ${(e.venue||'').split(',')[0]}</span>${leader?`<span>👤 ${leader.name.split(' ')[0]}</span>`:'<span style="color:var(--red)">⚠ Sin líder</span>'}</div></div>
+      <div class="status-chip ${sc.cls}">${sc.label}</div>
+    </div>`;
+  }).join('');
+ 
+  document.getElementById('d-team').innerHTML=TEAM.map(m=>{
+    const cnt=EVENTS.filter(e=>e.leader===m.id&&e.status!=='done').length;
+    return `<div class="team-member-row"><div class="member-avatar" style="background:${m.color}">${m.initials}</div><div class="member-info"><div class="member-name">${m.name}</div><div class="member-role">${m.role}</div></div><div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text3)">${cnt} ev.</div></div>`;
+  }).join('');
+ 
+  const tl=[...EVENTS].filter(e=>e.status!=='done').sort((a,b)=>new Date(a.date)-new Date(b.date));
+  document.getElementById('d-timeline').innerHTML=tl.map(e=>{
+    const tc=TC[e.type]||{icon:'📌',color:'#888'};const d=new Date(e.date+'T12:00:00');
+    const ds=d.toLocaleDateString('es',{day:'numeric',month:'short',year:'numeric'});
+    const dl=Math.ceil((d-new Date())/86400000);const dlc=dl<=7?'var(--red)':dl<=14?'var(--gold)':'var(--text3)';
+    return `<div style="display:flex;align-items:center;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openEv(${e.id})">
+      <div style="width:3px;height:36px;background:${tc.color};border-radius:3px;flex-shrink:0"></div>
+      <div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${e.name}</div><div style="font-size:11px;color:var(--text3)">${tc.icon} ${e.type} · 📅 ${ds} · 📍 ${(e.venue||'').split(',')[0]}</div></div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:${dlc};font-weight:600;white-space:nowrap">${dl<=0?'HOY':dl+'d'}</div>
+      <div class="pb-wrap"><div class="pb-fill" style="width:${e.progress}%;background:${tc.color}"></div></div>
+      <div style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace;width:28px;text-align:right">${e.progress}%</div>
+    </div>`;
+  }).join('');
+}
+ 
+// ============================================================
+// EVENTS TABLE
+// ============================================================
+function renderEventsTable(){
+  const types=Object.keys(TC);
+  document.getElementById('tf-chips').innerHTML=
+    `<div class="type-chip ${!tfFilter?'active':''}" onclick="setTF('',this)">Todos</div>`+
+    types.map(t=>{const tc=TC[t];return `<div class="type-chip ${tfFilter===t?'active':''}" style="${tfFilter===t?`background:${tc.bg};color:${tc.color};border-color:${tc.color}`:''}" onclick="setTF('${t}',this)">${tc.icon} ${t}</div>`;}).join('');
+ 
+  let f=[...EVENTS];
+  if(sfFilter!=='all') f=f.filter(e=>e.status===sfFilter);
+  if(tfFilter) f=f.filter(e=>e.type===tfFilter);
+  const sv=(document.getElementById('search-input')?.value||'').toLowerCase();
+  if(sv) f=f.filter(e=>e.name.toLowerCase().includes(sv)||(e.venue||'').toLowerCase().includes(sv));
+  f.sort((a,b)=>new Date(a.date)-new Date(b.date));
+ 
+  const tbody=document.getElementById('et-body');
+  if(!f.length){tbody.innerHTML=`<tr><td colspan="7"><div style="text-align:center;padding:60px;color:var(--text3)"><div style="font-size:48px;opacity:0.3;margin-bottom:16px">🔍</div>No se encontraron eventos</div></td></tr>`;return;}
+ 
+  tbody.innerHTML=f.map(e=>{
+    const tc=TC[e.type]||{icon:'📌',color:'#888',bg:'#222'};
+    const sc=SC[e.status]||{};
+    const d=new Date(e.date+'T12:00:00');
+    const ds=d.toLocaleDateString('es',{day:'numeric',month:'short',year:'numeric'});
+    const leader=e.leader?TEAM.find(t=>t.id===e.leader):null;
+    let lc;
+    if(leader) lc=`<div class="lc"><div class="la-sm" style="background:${leader.color}">${leader.initials}</div><div><div style="font-size:13px;font-weight:500">${leader.name}</div><div style="font-size:11px;color:var(--text3)">${leader.role}</div></div></div>`;
+    else if(isAdmin()) lc=`<button class="assign-btn" onclick="event.stopPropagation();openAssign(${e.id})">＋ Asignar Líder</button>`;
+    else lc=`<span class="assign-btn-disabled">Sin asignar</span>`;
+    return `<tr onclick="openEv(${e.id})">
+      <td><div style="font-weight:500">${e.name}</div>${e.capacity?`<div style="font-size:11px;color:var(--text3)">👥 ${Number(e.capacity).toLocaleString()}</div>`:''}</td>
+      <td><span class="type-tag" style="background:${tc.bg};color:${tc.color}">${tc.icon} ${e.type}</span></td>
+      <td><div style="font-weight:500">${ds}</div>${e.time?`<div style="font-size:11px;color:var(--text3)">🕐 ${e.time}</div>`:''}</td>
+      <td style="font-size:12px;color:var(--text2)">${e.venue||'—'}</td>
+      <td>${lc}</td>
+      <td><div style="display:flex;align-items:center;gap:8px"><div class="pb-wrap" style="width:60px"><div class="pb-fill" style="width:${e.progress}%;background:${tc.color}"></div></div><span style="font-size:11px;color:var(--text3);font-family:'JetBrains Mono',monospace">${e.progress}%</span></div></td>
+      <td><span class="status-chip ${sc.cls}">${sc.label}</span></td>
+    </tr>`;
+  }).join('');
+}
+function setSF(v,el){sfFilter=v;document.querySelectorAll('#sf-tabs .filter-tab').forEach(t=>t.classList.remove('active'));el.classList.add('active');renderEventsTable();}
+function setTF(v,el){tfFilter=v;renderEventsTable();}
+function searchEvents(v){if(curPage==='events')renderEventsTable();}
+ 
+// ============================================================
+// CALENDAR
+// ============================================================
+function renderCalendar(){
+  const months=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('cal-label').textContent=`${months[calM]} ${calY}`;
+  const grid=document.getElementById('cal-grid');
+  const headers=grid.querySelectorAll('.cal-dh');
+  grid.innerHTML=''; headers.forEach(h=>grid.appendChild(h));
+  const fd=new Date(calY,calM,1).getDay();
+  const dim=new Date(calY,calM+1,0).getDate();
+  const dip=new Date(calY,calM,0).getDate();
+  const today=new Date();
+  for(let i=fd-1;i>=0;i--){const c=document.createElement('div');c.className='cal-cell om';c.innerHTML=`<div class="cal-date">${dip-i}</div>`;grid.appendChild(c);}
+  for(let d=1;d<=dim;d++){
+    const c=document.createElement('div');
+    const isTod=today.getFullYear()===calY&&today.getMonth()===calM&&today.getDate()===d;
+    c.className='cal-cell'+(isTod?' today':'');
+    c.innerHTML=`<div class="cal-date">${d}</div>`;
+    const ds=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    EVENTS.filter(e=>e.date===ds).forEach(e=>{
+      const tc=TC[e.type]||{icon:'📌',color:'#888',bg:'#222'};
+      const dot=document.createElement('div'); dot.className='cal-ed';
+      dot.style.cssText=`background:${tc.bg};color:${tc.color}`;
+      dot.textContent=`${tc.icon} ${e.name}`; dot.onclick=()=>openEv(e.id);
+      c.appendChild(dot);
+    });
+    grid.appendChild(c);
+  }
+  const total=fd+dim, rem=total%7===0?0:7-(total%7);
+  for(let d=1;d<=rem;d++){const c=document.createElement('div');c.className='cal-cell om';c.innerHTML=`<div class="cal-date">${d}</div>`;grid.appendChild(c);}
+}
+function changeMonth(dir){calM+=dir;if(calM>11){calM=0;calY++;}if(calM<0){calM=11;calY--;}renderCalendar();}
+ 
+// ============================================================
+// TEAM
+// ============================================================
+function renderTeam(){
+  document.getElementById('team-grid').innerHTML=TEAM.map(m=>{
+    const my=EVENTS.filter(e=>e.leader===m.id);
+    const a=my.filter(e=>e.status==='active').length;
+    const u=my.filter(e=>e.status==='upcoming'||e.status==='planning').length;
+    const d=my.filter(e=>e.status==='done').length;
+    const cur=my.filter(e=>e.status!=='done').slice(0,3);
+    return `<div class="team-card">
+      <div style="position:absolute;top:0;left:0;right:0;height:3px;background:${m.color};border-radius:14px 14px 0 0"></div>
+      <div class="tc-top"><div class="tc-avatar" style="background:${m.color}">${m.initials}</div><div><div class="tc-name">${m.name}</div><div class="tc-role">${m.role}</div>${m.email?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${m.email}</div>`:''}</div></div>
+      ${m.specialties?.length?`<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:14px">${m.specialties.map(s=>`<span style="font-size:10px;padding:2px 8px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text3)">${s}</span>`).join('')}</div>`:''}
+      <div class="tc-stats">
+        <div><div class="tc-sv" style="color:${m.color}">${a}</div><div class="tc-sl">Activos</div></div>
+        <div><div class="tc-sv" style="color:var(--blue)">${u}</div><div class="tc-sl">Próximos</div></div>
+        <div><div class="tc-sv" style="color:var(--text3)">${d}</div><div class="tc-sl">Finalizados</div></div>
+      </div>
+      ${cur.length?`<div class="tc-evs">${cur.map(e=>`<span class="tc-et">${TC[e.type]?.icon||'📌'} ${e.name}</span>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+}
+ 
+// ============================================================
+// ADMIN PANEL
+// ============================================================
+function renderAdmin(){
+  if(!isAdmin()) return;
+  USERS=JSON.parse(localStorage.getItem(SK_USERS)||'[]');
+  document.getElementById('admin-tbody').innerHTML=USERS.map(u=>{
+    const ls=u.lastSeen?new Date(u.lastSeen).toLocaleDateString('es',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'—';
+    const badge=u.role==='admin'?'<span class="badge-admin">⭐ Admin</span>':u.role==='user'?'<span class="badge-user">👤 Usuario</span>':'<span class="badge-pending">⏳ Pendiente</span>';
+    const isMe=u.id===CU.id;
+    const action=isMe
+      ?`<span style="font-size:11px;color:var(--text3)">— tu cuenta</span>`
+      :`<div style="display:flex;align-items:center;gap:8px">
+          <select class="role-select" onchange="changeRole('${u.id}',this.value)">
+            <option value="pending" ${u.role==='pending'?'selected':''}>⏳ Pendiente</option>
+            <option value="user" ${u.role==='user'?'selected':''}>👤 Usuario</option>
+            <option value="admin" ${u.role==='admin'?'selected':''}>⭐ Administrador</option>
+          </select>
+          <button class="btn btn-danger" style="padding:5px 10px;font-size:11px" onclick="removeUser('${u.id}')">Eliminar</button>
+        </div>`;
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:10px"><div class="member-avatar" style="background:${u.color||'#888'};width:32px;height:32px;font-size:11px">${u.initials||'?'}</div><div><div style="font-weight:500">${u.name}</div>${isMe?'<div style="font-size:10px;color:var(--gold)">Tu cuenta</div>':''}</div></div></td>
+      <td style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2)">${u.email}</td>
+      <td style="font-size:12px;color:var(--text3)">${ls}</td>
+      <td>${badge}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+}
+ 
+function changeRole(uid,role){
+  USERS=JSON.parse(localStorage.getItem(SK_USERS)||'[]');
+  const u=USERS.find(x=>x.id===uid); if(!u) return;
+  u.role=role; saveUsers();
+  showToast(`✓ ${u.name} → ${role==='admin'?'Administrador':role==='user'?'Usuario':'Pendiente'}`);
+  renderAdmin();
+}
+ 
+function removeUser(uid){
+  USERS=JSON.parse(localStorage.getItem(SK_USERS)||'[]');
+  const u=USERS.find(x=>x.id===uid); if(!u) return;
+  if(!confirm(`¿Eliminar acceso de ${u.name}?`)) return;
+  USERS=USERS.filter(x=>x.id!==uid); saveUsers();
+  showToast(`🗑 ${u.name} eliminado`); renderAdmin();
+}
+ 
+// ============================================================
+// EVENT MODAL
+// ============================================================
+function openEv(id){
+  const e=EVENTS.find(x=>x.id===id); if(!e) return;
+  const tc=TC[e.type]||{icon:'📌',color:'#888',bg:'#222'};
+  const sc=SC[e.status]||{};
+  const d=new Date(e.date+'T12:00:00');
+  const ds=d.toLocaleDateString('es',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const leader=e.leader?TEAM.find(t=>t.id===e.leader):null;
+  const dl=Math.ceil((d-new Date())/86400000);
+ 
+  let lSec;
+  if(leader){
+    const chgBtn=isAdmin()?`<button class="btn btn-ghost" style="font-size:12px" onclick="openAssign(${e.id})">Cambiar</button>`:'';
+    lSec=`<div style="display:flex;align-items:center;gap:14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px">
+      <div class="member-avatar" style="background:${leader.color};width:44px;height:44px;font-size:15px">${leader.initials}</div>
+      <div style="flex:1"><div style="font-size:15px;font-weight:600">${leader.name}</div><div style="font-size:12px;color:var(--text3)">${leader.role}</div><div style="font-size:11px;color:var(--text3)">${leader.email||''}</div></div>
+      ${chgBtn}
+    </div>`;
+  } else if(isAdmin()){
+    lSec=`<div style="background:rgba(255,92,122,0.06);border:1px dashed rgba(255,92,122,0.3);border-radius:10px;padding:16px;display:flex;align-items:center;gap:12px">
+      <span style="font-size:20px">⚠️</span><div style="flex:1"><div style="font-size:13px;color:var(--red);font-weight:500">Sin líder asignado</div><div style="font-size:11px;color:var(--text3)">Requiere un responsable</div></div>
+      <button class="btn btn-primary" onclick="openAssign(${e.id})">Asignar Líder</button>
+    </div>`;
+  } else {
+    lSec=`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:13px;color:var(--text3)">⚠️ Sin líder asignado. Solo un administrador puede realizar esta acción.</div>`;
+  }
+ 
+  const adminActs=isAdmin()?`<button class="btn btn-ghost" onclick="setEvStatus(${e.id},'active')" style="${e.status==='active'?'border-color:var(--green);color:var(--green)':''}">✓ Activo</button><button class="btn btn-ghost" onclick="setEvStatus(${e.id},'done')">✓ Finalizar</button><div style="flex:1"></div><button class="btn btn-danger" onclick="deleteEv(${e.id})">🗑</button>`:'';
+ 
+  document.getElementById('ev-modal-content').innerHTML=`
+    <div class="mh">
+      <div class="mti" style="background:${tc.bg}">${tc.icon}</div>
+      <div class="mht">
+        <div class="men">${e.name}</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span class="status-chip ${sc.cls}">${sc.label}</span>
+          <span class="type-tag" style="background:${tc.bg};color:${tc.color}">${tc.icon} ${e.type}</span>
+          ${dl>=0&&e.status!=='done'?`<span style="font-size:11px;color:${dl<=7?'var(--red)':'var(--text3)'}">⏱ ${dl===0?'HOY':dl+'d restantes'}</span>`:''}
+        </div>
+      </div>
+      <div class="mc" onclick="closeModal('ev-modal')">✕</div>
+    </div>
+    <div class="mb">
+      <div class="mg">
+        <div class="mf"><div class="mfl">Fecha</div><div class="mfv">${ds}</div></div>
+        <div class="mf"><div class="mfl">Hora</div><div class="mfv">${e.time||'—'}</div></div>
+        <div class="mf"><div class="mfl">Aforo</div><div class="mfv">${e.capacity?Number(e.capacity).toLocaleString()+' personas':'—'}</div></div>
+        <div class="mf" style="grid-column:1/-1"><div class="mfl">Venue</div><div class="mfv">📍 ${e.venue||'—'}</div></div>
+        <div class="mf" style="grid-column:1/-1">
+          <div class="mfl">Progreso</div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+            <div style="flex:1;background:var(--surface3);border-radius:20px;height:8px;overflow:hidden"><div style="width:${e.progress}%;height:100%;background:${tc.color};border-radius:20px"></div></div>
+            <span style="font-family:'JetBrains Mono',monospace;font-size:14px;color:${tc.color};font-weight:700">${e.progress}%</span>
+          </div>
+        </div>
+      </div>
+      <div class="mst">LÍDER RESPONSABLE</div>
+      ${lSec}
+      ${e.notes?`<div class="mst">NOTAS</div><div class="mnotes">${e.notes}</div>`:''}
+      <div class="ma">${adminActs}<button class="btn btn-ghost" onclick="closeModal('ev-modal')" style="${!isAdmin()?'margin-left:auto':''}">Cerrar</button></div>
+    </div>`;
+  document.getElementById('ev-modal').classList.add('open');
+}
+ 
+function openAssign(evId){
+  if(!isAdmin()){ showToast('⛔ Solo administradores pueden asignar líderes','error'); return; }
+  closeModal('ev-modal');
+  const e=EVENTS.find(x=>x.id===evId);
+  document.getElementById('ev-modal-content').innerHTML=`
+    <div class="mh"><div class="mti" style="background:var(--gold-dim)">👤</div><div class="mht"><div class="men">ASIGNAR LÍDER</div><div style="font-size:13px;color:var(--text3)">${e?.name}</div></div><div class="mc" onclick="closeModal('ev-modal')">✕</div></div>
+    <div class="mb"><div style="display:flex;flex-direction:column;gap:10px">
+      ${TEAM.map(m=>{
+        const cnt=EVENTS.filter(ev=>ev.leader===m.id&&ev.status!=='done').length;
+        const isAss=e?.leader===m.id;
+        return `<div onclick="assignLeader(${evId},${m.id})" style="display:flex;align-items:center;gap:14px;padding:14px;background:${isAss?'var(--gold-dim)':'var(--surface2)'};border:1px solid ${isAss?'var(--gold)':'var(--border)'};border-radius:10px;cursor:pointer;transition:all 0.15s">
+          <div class="member-avatar" style="background:${m.color};width:42px;height:42px;font-size:15px">${m.initials}</div>
+          <div style="flex:1"><div style="font-size:14px;font-weight:600">${m.name}</div><div style="font-size:12px;color:var(--text3)">${m.role} · ${cnt} eventos activos</div></div>
+          ${isAss?'<span style="font-size:11px;font-weight:700;padding:3px 10px;border-radius:10px;background:var(--gold);color:var(--bg)">ASIGNADO</span>':''}
+        </div>`;
+      }).join('')}
+      <div onclick="assignLeader(${evId},null)" style="display:flex;align-items:center;gap:14px;padding:12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;cursor:pointer">
+        <div style="width:42px;height:42px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:18px">✕</div>
+        <div style="font-size:13px;color:var(--text3)">Sin asignar (quitar líder)</div>
+      </div>
+    </div></div>`;
+  document.getElementById('ev-modal').classList.add('open');
+}
+ 
+function assignLeader(evId,lid){
+  if(!isAdmin()) return;
+  const e=EVENTS.find(x=>x.id===evId); if(e) e.leader=lid;
+  const l=lid?TEAM.find(t=>t.id===lid):null;
+  showToast(lid?`✓ ${l.name} asignado a "${e.name}"`:`Líder removido de "${e.name}"`);
+  closeModal('ev-modal'); refresh(); updateBadge();
+}
+ 
+function setEvStatus(id,status){
+  if(!isAdmin()) return;
+  const e=EVENTS.find(x=>x.id===id); if(e){e.status=status;if(status==='done')e.progress=100;}
+  showToast(`Estado: ${SC[status]?.label}`); closeModal('ev-modal'); refresh(); updateBadge();
+}
+ 
+function deleteEv(id){
+  if(!isAdmin()) return;
+  const e=EVENTS.find(x=>x.id===id);
+  if(!confirm(`¿Eliminar "${e?.name}"?`)) return;
+  EVENTS=EVENTS.filter(x=>x.id!==id);
+  closeModal('ev-modal'); showToast('🗑 Evento eliminado'); refresh(); updateBadge();
+}
+ 
+// ============================================================
+// NEW EVENT / MEMBER (admin only)
+// ============================================================
+function openNewEvent(){
+  if(!isAdmin()){showToast('⛔ Solo administradores pueden crear eventos','error');return;}
+  const s=document.getElementById('ne-leader');
+  s.innerHTML='<option value="">Sin asignar</option>'+TEAM.map(m=>`<option value="${m.id}">${m.name} — ${m.role}</option>`).join('');
+  document.getElementById('ne-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('new-ev-modal').classList.add('open');
+}
+ 
+function createEvent(){
+  if(!isAdmin()) return;
+  const name=document.getElementById('ne-name').value.trim();
+  const type=document.getElementById('ne-type').value;
+  const date=document.getElementById('ne-date').value;
+  if(!name||!type||!date){showToast('⚠ Nombre, tipo y fecha requeridos','error');return;}
+  const newId=Math.max(...EVENTS.map(e=>e.id),0)+1;
+  EVENTS.push({id:newId,name,type,status:document.getElementById('ne-status').value,date,time:document.getElementById('ne-time').value,venue:document.getElementById('ne-venue').value.trim(),leader:document.getElementById('ne-leader').value?parseInt(document.getElementById('ne-leader').value):null,notes:document.getElementById('ne-notes').value.trim(),capacity:document.getElementById('ne-cap').value?parseInt(document.getElementById('ne-cap').value):null,progress:parseInt(document.getElementById('ne-prog').value)||0});
+  closeModal('new-ev-modal');showToast(`✓ "${name}" creado`);
+  ['ne-name','ne-type','ne-time','ne-venue','ne-notes','ne-cap'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('ne-prog').value='0';document.getElementById('ne-status').value='planning';
+  refresh();updateBadge();
+}
+ 
+function openNewMember(){
+  if(!isAdmin()){showToast('⛔ Solo administradores pueden agregar miembros','error');return;}
+  document.getElementById('new-mb-modal').classList.add('open');
+}
+ 
+function createMember(){
+  if(!isAdmin()) return;
+  const name=document.getElementById('nm-name').value.trim();
+  const role=document.getElementById('nm-role').value.trim();
+  if(!name||!role){showToast('⚠ Nombre y cargo requeridos','error');return;}
+  const initials=name.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  const color=COLORS[TEAM.length%COLORS.length];
+  const newId=Math.max(...TEAM.map(t=>t.id),0)+1;
+  TEAM.push({id:newId,name,role,email:document.getElementById('nm-email').value.trim(),phone:document.getElementById('nm-phone').value.trim(),initials,color,specialties:document.getElementById('nm-spec').value?document.getElementById('nm-spec').value.split(',').map(s=>s.trim()):[]});
+  closeModal('new-mb-modal');showToast(`✓ ${name} agregado`);
+  ['nm-name','nm-role','nm-email','nm-phone','nm-spec'].forEach(id=>document.getElementById(id).value='');
+  renderTeam();
+}
+ 
+// ============================================================
+// UTILS
+// ============================================================
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+function showToast(msg,type='success'){
+  const c=document.getElementById('tc');const t=document.createElement('div');
+  t.className='toast'+(type==='error'?' error':'');if(type==='error')t.style.borderLeftColor='var(--red)';
+  t.textContent=msg;c.appendChild(t);
+  setTimeout(()=>{t.style.animation='toastOut 0.3s ease forwards';setTimeout(()=>t.remove(),300);},3000);
+}
+function toggleMenu(){document.getElementById('user-menu').classList.toggle('open');}
+document.addEventListener('click',e=>{if(!e.target.closest('.sidebar-bottom'))document.getElementById('user-menu')?.classList.remove('open');});
+document.querySelectorAll('.modal-overlay').forEach(o=>o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');}));
+document.addEventListener('keydown',e=>{if(e.key==='Escape')document.querySelectorAll('.modal-overlay.open').forEach(m=>m.classList.remove('open'));});
+ 
+// INIT
+initApp();
+</script>
+</body>
+</html>
