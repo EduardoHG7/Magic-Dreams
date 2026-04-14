@@ -483,9 +483,17 @@ function clearSess(){ sessionStorage.removeItem(SK_SESSION); }
  
 // Seed: Eduardo = admin always
 (function seedAdmin(){
-  const e = 'eduardo@magicdr.com';
+  const e = 'eherrera@magicdreamspty.com';
   if(!USERS.find(u=>u.email===e)){
-    USERS.push({ id:'admin-ed', name:'Eduardo', email:e, role:'admin', initials:'ED', color:'#f0c040', lastSeen:new Date().toISOString() });
+    USERS.push({
+      id: 'admin-ed',
+      name: 'Eduardo Herrera',
+      email: e,
+      role: 'admin',
+      initials: 'EH',
+      color: '#f0c040',
+      lastSeen: new Date().toISOString()
+    });
     saveUsers();
   }
 })();
